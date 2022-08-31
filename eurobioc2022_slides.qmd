@@ -160,6 +160,7 @@ fs::dir_tree("data")
 # Load necessary libraries
 library(MSA2dist)
 library(Biostrings)
+library(tidyr)
 library(dplyr)
 library(stringr)
 
@@ -189,9 +190,12 @@ length(table(clusters$Cluster))
 # Get size distribution of clusters
 head(table(clusters$Cluster))
 
-# Get one random cluster of size 10
-my_cluster <- clusters %>% dplyr::filter(
-    Cluster==sample(which(table(clusters$Cluster)==10), 1))
+# Get first cluster of size 10 (fc10)
+fc10 <- which(table(clusters$Cluster)==10)[1]
+
+my_cluster <- clusters %>%
+    dplyr::filter(Cluster==fc10)
+
 head(my_cluster)
 ```
 
@@ -201,12 +205,14 @@ head(my_cluster)
 #| echo: true
 # Remove species unique identifier and add as GeneID
 my_cluster$GeneID <- stringr::str_split_fixed(my_cluster$Gene, "_", 2)[, 2]
-my_cluster
+
+head(my_cluster)
 
 # Fetch coding sequences
 my_cds <- codingsequences[match(my_cluster$GeneID, 
     names(codingsequences))]
-my_cds
+
+head(my_cds)
 ```
 
 ## Coding sequence alignment
@@ -230,6 +236,13 @@ cds1_cds2_kaks <- dnastring2kaks(cds1_cds2_aln,
 cds1_cds2_kaks
 ```
 
+Other *Biostrings::pairwiseAlignment* options can be set:
+
+```
+type = "global", substitutionMatrix = "BLOSUM62"
+gapOpening = 10, gapExtension = 0.5
+```
+
 ## Parallelized pairwise coding sequence alignments
 
 To calculate all pairwise combinations:
@@ -251,6 +264,46 @@ How long did it take?
 ```{r dnastring2kaks_time}
 #| echo: true
 end_time - start_time
+```
+
+## Transform Ka values into a distance matrix
+
+```{r ka_mat1}
+#| echo: true
+ka_mat <- my_cds_kaks %>%
+    dplyr::select(seq1, seq2, Ka) %>%
+    dplyr::mutate(Ka = as.numeric(Ka)) %>%
+    tidyr::pivot_wider(names_from = "seq1", values_from = Ka)
+
+head(ka_mat)
+```
+
+## Transform Ka values into a distance matrix
+
+```{r ka_mat2}
+#| echo: true
+# Extract sequence names
+seq_names <- c(colnames(ka_mat)[-1], rev(ka_mat$seq2)[1])
+
+# Add NA to fill into square distance matrix
+ka_mat <- NA |> rbind(ka_mat[, -1]) |> cbind(NA) |>
+    tidyr::as_tibble()
+
+# Set column names
+colnames(ka_mat) <- seq_names
+
+head(ka_mat)
+```
+
+## Use distance matrix to plot bionjs tree
+
+*ape::bionjs* reconstructs a phylogenetic tree from a distance matrix with possibly missing values:
+
+```{r bionjs_tree}
+#| echo: true
+# Calculate and plot bionjs tree
+(ka_mat |> as.dist() |> ape::bionjs()) |>
+    plot(cex=1)
 ```
 
 ## Calculate average behavior of each codon
