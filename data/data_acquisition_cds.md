@@ -29,12 +29,19 @@ cds_urls <- c(
     Ppatens = "ftp://ftp.psb.ugent.be/pub/plaza/plaza_pico_03/Fasta/cds.selected_transcript.ppa.fasta.gz"
 )
 
-## Headers in .fa files have protein IDs. Read proteomes and keep only gene IDs
+## Headers in .fa files have protein IDs. Read sequences and keep only gene IDs
 codingsequences <- lapply(cds_urls, function(x) {
     seq <- Biostrings::readDNAStringSet(x)
     names(seq) <- gsub(".* \\| ", "", names(seq))
     return(seq)
 })
+
+## Convert List of DNAStringSet into one big DNAStringSet
+codingsequences <- Biostrings::DNAStringSet(unlist(
+    DNAStringSetList(codingsequences,
+    use.names = FALSE)))
+
+## Save codingsequences object
 save(
     codingsequences, 
     file = here::here("data", "codingsequences.rda"),

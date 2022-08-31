@@ -142,7 +142,7 @@ remotes::install_github("kullrich/MSA2dist")
 fs::dir_tree("data")
 ```
 
-1. `codingsequences.rda`: List of *DNAStringSet* objects.
+1. `codingsequences.rda`: *DNAStringSet* object.
 2. `clusters.rda`: Pre-calculated *syntenet* clusters.
 
 :::
@@ -157,17 +157,24 @@ fs::dir_tree("data")
 
 ```{r data_codingsequences}
 #| echo: true
+# Load necessary libraries
+library(MSA2dist)
+library(Biostrings)
+library(dplyr)
+library(stringr)
+
+# Load data set codingsequences
 load(here::here("data", "codingsequences.rda"))
 
 # Inspect data
-names(codingsequences)
-head(codingsequences$Aprotothecoides)
+head(names(codingsequences))
 ```
 
 ## Example data set: `clusters`
 
 ```{r data_clusters}
 #| echo: true
+# Load data set clusters
 load(here::here("data", "clusters.rda"))
 
 # Inspect data
@@ -179,11 +186,10 @@ length(table(clusters$Cluster))
 
 ```{r fetch_cds_from_cluster1}
 #| echo: true
-library(MSA2dist)
-library(dplyr)
-library(stringr)
+# Get size distribution of clusters
+head(table(clusters$Cluster))
 
-# Get random cluster of size 10
+# Get one random cluster of size 10
 my_cluster <- clusters %>% dplyr::filter(
     Cluster==sample(which(table(clusters$Cluster)==10), 1))
 head(my_cluster)
@@ -193,16 +199,13 @@ head(my_cluster)
 
 ```{r fetch_cds_from_cluster2}
 #| echo: true
-# Get species unique identifier
-ab_len <- syntenet:::species_id_length(codingsequences)
-s_abbrev <- substr(names(codingsequences), 1, ab_len)
+# Remove species unique identifier and add as GeneID
+my_cluster$GeneID <- stringr::str_split_fixed(my_cluster$Gene, "_", 2)[, 2]
+my_cluster
 
 # Fetch coding sequences
-my_cds <- do.call(c, apply(
-    stringr::str_split_fixed(my_cluster$Gene, "_", 2), 1,
-    function(x) {
-        tmp<-codingsequences[s_abbrev==x[1]][[1]];
-        tmp[names(tmp)==x[2]]}))
+my_cds <- codingsequences[match(my_cluster$GeneID, 
+    names(codingsequences))]
 my_cds
 ```
 
@@ -233,7 +236,6 @@ To calculate all pairwise combinations:
 
 ```{r dnastring2kaks_isMSA}
 #| echo: true
-#| cache: true
 #| code-line-numbers: 2-4,7
 start_time <- Sys.time()
 # Calculate dN/dS for the whole cluster; model = YN
